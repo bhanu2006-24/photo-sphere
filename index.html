@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhotoSphere - Simple Image Gallery</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configure Tailwind for custom styles -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-dark': '#1e293b', // Slate 800
+                        'secondary-dark': '#0f172a', // Slate 900
+                        'accent': '#3b82f6', // Blue 500
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Apply custom font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+        /* Custom scrollbar for aesthetics (optional) */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #475569; /* Slate 600 */
+            border-radius: 4px;
+        }
+
+        /* Loading Spinner Animation */
+        .spinner {
+            border-top-color: #3b82f6; /* Accent color */
+            -webkit-animation: spin 1s infinite linear;
+            animation: spin 1s infinite linear;
+        }
+
+            /* Plain, unprefixed CSS keyframes */
+            @keyframes spin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+            }
+
+            /* Example usage */
+            .spinner {
+            animation: spin 1s linear infinite;
+            }
+
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Image Overlay for details */
+        .img-overlay {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .img-card:hover .img-overlay {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body class="bg-secondary-dark text-white font-sans min-h-screen">
+
+    <!-- Sticky Header/Navigation Bar -->
+    <header class="sticky top-0 z-10 bg-secondary-dark/95 backdrop-blur-sm shadow-xl p-4 md:p-6 border-b border-primary-dark">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <h1 class="text-3xl font-extrabold text-accent">PhotoSphere</h1>
+            <nav class="space-x-4 text-sm font-medium hidden sm:block">
+                <a href="#" class="hover:text-accent transition duration-200">Explore</a>
+                <a href="#" class="hover:text-accent transition duration-200">License</a>
+                <a href="#" class="hover:text-accent transition duration-200 bg-accent py-2 px-4 rounded-full text-white shadow-lg">Upload</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="max-w-4xl mx-auto p-8 text-center my-8">
+        <h2 class="text-5xl md:text-6xl font-black mb-4 leading-tight">
+            The best free stock photos, shared by talented creators.
+        </h2>
+        <p class="text-gray-400 text-lg mb-8">
+            Powered by the high-quality images from <a href="https://picsum.photos/" target="_blank" class="text-accent underline hover:text-blue-400">Lorem Picsum</a>.
+        </p>
+        <!-- Search Bar (Non-functional, for aesthetic) -->
+        <div class="relative max-w-xl mx-auto">
+            <input type="search" placeholder="Search for nature, abstract, or city..."
+                   class="w-full p-4 pl-12 rounded-xl bg-primary-dark border-2 border-gray-700 focus:border-accent outline-none transition duration-300 text-lg text-white">
+            <svg class="w-6 h-6 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </div>
+    </section>
+
+    <!-- Image Gallery Section -->
+    <main class="max-w-7xl mx-auto p-4 md:p-8">
+        <h3 class="text-2xl font-bold mb-6 border-l-4 border-accent pl-3 text-gray-200">Latest Free Photos</h3>
+        
+        <!-- Grid Container for Images -->
+        <div id="gallery" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <!-- Images will be injected here -->
+        </div>
+        
+        <!-- Loading Indicator / Sentinel -->
+        <div id="loading-indicator" class="flex justify-center items-center py-12">
+            <div class="spinner border-4 border-gray-600 border-solid rounded-full h-10 w-10"></div>
+            <p class="ml-4 text-lg text-gray-400">Loading more visuals...</p>
+        </div>
+        
+        <!-- Error/End of Content Message -->
+        <div id="error-message" class="hidden text-center py-12 text-red-400 text-lg">
+            <p>An error occurred while fetching images. Please check the console.</p>
+        </div>
+    </main>
+
+    <footer class="text-center py-6 text-gray-500 text-sm border-t border-primary-dark mt-12">
+        &copy; 2025 PhotoSphere - Powered by Picsum API. Design inspired by Pexels.
+    </footer>
+
+    <script>
+        // --- API & State Variables ---
+        const PICSUM_API = 'https://picsum.photos/v2/list';
+        const PHOTOS_PER_PAGE = 16;
+        let currentPage = 1;
+        let isLoading = false;
+        let hasMore = true;
+
+        const gallery = document.getElementById('gallery');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const errorMessage = document.getElementById('error-message');
+
+        // --- Utility Functions ---
+
+        // Simple function to create the HTML string for an image card
+        function createPhotoCard(photo) {
+            // Picsum provides a download_url which is the full resolution image
+            const imgUrl = photo.download_url;
+            // Use the ID to get a consistent small version for the grid thumbnail
+            const thumbnailUrl = `https://picsum.photos/id/${photo.id}/600/400`;
+            const author = photo.author;
+            
+            // Create a unique ID for the image and the button
+            const imageId = `img-${photo.id}`;
+
+            return `
+                <div class="img-card relative overflow-hidden rounded-xl shadow-2xl bg-primary-dark transition-all duration-300 ease-in-out transform hover:scale-[1.02] hover:shadow-accent/50 group">
+                    <!-- Image Thumbnail -->
+                    <img id="${imageId}" 
+                         src="${thumbnailUrl}" 
+                         onerror="this.src='https://placehold.co/600x400/1e293b/f8fafc?text=Image+Load+Error'"
+                         alt="Photo by ${author}" 
+                         class="w-full h-auto object-cover transition-opacity duration-500 ease-in-out group-hover:opacity-80">
+
+                    <!-- Overlay for Details and Download -->
+                    <div class="img-overlay absolute inset-0 bg-black bg-opacity-60 flex flex-col justify-end p-4 text-white">
+                        <p class="text-sm font-light text-gray-300 mb-2">By:</p>
+                        <h4 class="text-xl font-semibold mb-3 truncate">${author}</h4>
+                        <div class="flex space-x-2">
+                            <a href="${imgUrl}" target="_blank" class="flex-1 text-center py-2 text-sm font-medium rounded-lg bg-accent hover:bg-blue-600 transition duration-200">
+                                Download
+                            </a>
+                            <button onclick="copyAuthor('${author}')" class="flex-1 text-center py-2 text-sm font-medium rounded-lg border border-white/30 hover:bg-white/10 transition duration-200">
+                                Copy Author
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Function to copy text to clipboard (using execCommand for better iFrame compatibility)
+        function copyAuthor(text) {
+            const tempInput = document.createElement('textarea');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            
+            try {
+                document.execCommand('copy');
+                // Use a temporary visual feedback instead of alert()
+                const originalText = 'Copy Author';
+                const button = event.target;
+                button.innerText = 'Copied!';
+                setTimeout(() => {
+                    button.innerText = originalText;
+                }, 1500);
+            } catch (err) {
+                console.error('Copy failed: ', err);
+            }
+            document.body.removeChild(tempInput);
+        }
+
+        // --- Core Fetching Logic ---
+
+        async function fetchImages() {
+            if (isLoading || !hasMore) {
+                return;
+            }
+
+            isLoading = true;
+            loadingIndicator.style.display = 'flex';
+            errorMessage.style.display = 'none';
+
+            try {
+                const url = `${PICSUM_API}?page=${currentPage}&limit=${PHOTOS_PER_PAGE}`;
+                const response = await fetch(url);
+                
+                // Check if the response contains a Link header for pagination (Picsum standard)
+                const linkHeader = response.headers.get('Link');
+                if (!linkHeader || !linkHeader.includes('rel="next"')) {
+                    hasMore = false;
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const photos = await response.json();
+
+                if (photos.length === 0) {
+                    hasMore = false;
+                    // Display end of content message
+                    loadingIndicator.innerHTML = '<p class="text-xl text-gray-500">You\'ve reached the end of the public collection!</p>';
+                } else {
+                    renderImages(photos);
+                    currentPage++;
+                }
+
+            } catch (error) {
+                console.error("Failed to fetch images:", error);
+                errorMessage.style.display = 'block';
+                loadingIndicator.style.display = 'none';
+            } finally {
+                isLoading = false;
+                if(hasMore) {
+                    loadingIndicator.style.display = 'flex';
+                } else {
+                    loadingIndicator.style.display = 'none';
+                }
+            }
+        }
+
+        // --- Rendering Function ---
+
+        function renderImages(photos) {
+            let htmlContent = '';
+            photos.forEach(photo => {
+                htmlContent += createPhotoCard(photo);
+            });
+            gallery.insertAdjacentHTML('beforeend', htmlContent);
+        }
+
+        // --- Infinite Scroll Implementation using Intersection Observer ---
+
+        const observer = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                // If the loading indicator is visible (intersecting) and we're not already loading
+                if (entry.isIntersecting && !isLoading && hasMore) {
+                    fetchImages();
+                }
+            });
+        }, {
+            // RootMargin defines when the observer triggers (0px from the bottom)
+            rootMargin: '0px 0px 200px 0px', 
+            threshold: 0.1 
+        });
+        
+        // Start observing the loading indicator element
+        if (loadingIndicator) {
+            observer.observe(loadingIndicator);
+        }
+
+        // --- Initial Load ---
+        window.onload = () => {
+            // First load is handled by the Intersection Observer immediately upon page load
+            // since the loading indicator is likely in the viewport or close to it.
+        };
+        
+        // Expose copy function for use in onclick
+        window.copyAuthor = copyAuthor;
+
+    </script>
+</body>
+</html>
